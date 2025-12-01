@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>永鑫贸易合作社有限公司 - AG 现金流报表 V6.7 (开户类型联动修正版)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --bg-color: #fef9c3;
+    --card-bg: #ffffff;
+    --primary: #f59e0b; /* 橙色 */
+    --gold: #d97706; /* 深金色用于品牌名 */
+    --danger: #dc2626;
+    --success: #0d9488;
+    --text-main: #1f2937;
+    --text-sub: #6b7280;
+    --border: #e5e7eb;
+  }
+
+  body {
+    margin: 0; padding: 0;
+    background-color: var(--bg-color);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text-main);
+    font-size: 14px;
+  }
+
+  .hidden { display: none !important; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 15px; }
+  
+  .card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  h2, h3, h4 { margin: 0 0 10px 0; font-weight: 600; }
+  h3 { font-size: 16px; color: var(--text-main); border-bottom: 2px solid var(--bg-color); padding-bottom: 8px; margin-bottom: 15px;}
+  
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;}
+  .col { flex: 1; min-width: 150px; }
+  
+  label { display: block; font-size: 12px; color: var(--text-sub); margin-bottom: 4px; }
+  input, select {
+    width: 100%; box-sizing: border-box;
+    padding: 8px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 14px; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--primary); }
+
+  button {
+    cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px;
+    font-size: 13px; font-weight: 500; transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.9; }
+  button.primary { background: var(--primary); color: white; }
+  button.danger { background: var(--danger); color: white; }
+  button.teal { background: var(--success); color: white; }
+  button.secondary { background: #e5e7eb; color: var(--text-main); }
+  button.sm { padding: 4px 10px; font-size: 12px; }
+
+  /* 拖拽相关样式 */
+  .acc-item {
+    background: white; padding: 6px 8px; margin-bottom: 6px;
+    border-radius: 4px; border: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .acc-item:hover { box-shadow: 0 0 0 2px var(--primary); } 
+  .acc-item.selected { box-shadow: 0 0 0 3px var(--success); } 
+  .acc-item.dragging { opacity: 0.5; background: #fef3c7; border: 1px dashed var(--primary); }
+  .acc-item.drag-over { border-top: 2px solid var(--primary); }
+
+  /* 账户管理按钮 */
+  .acc-controls { display: none; gap: 5px; margin-left: 10px; }
+  .acc-item:hover .acc-controls { display: flex; }
+  .btn-icon { cursor: pointer; padding: 2px 5px; border-radius: 4px; font-size: 12px; }
+  .btn-icon.edit { background: #e5e7eb; color: #374151; }
+  .btn-icon.del { background: #fee2e2; color: #dc2626; }
+
+  /* 账户列表布局 (Grouped) */
+  .acc-scroll { display: flex; flex-wrap: wrap; gap: 15px; padding-bottom: 0; }
+  .acc-group {
+    flex: 1; min-width: 180px;
+    background: #f9fafb; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .acc-group h4 { font-size: 14px; color: var(--text-main); text-align: center; margin-bottom: 10px; border-bottom: 1px dashed var(--border); padding-bottom: 5px;}
+  .acc-bal { font-weight: bold; font-family: monospace; font-size: 13px; }
+  .acc-bal.neg { color: var(--danger); }
+
+  /* 表格样式 & 固定表头 */
+  .table-responsive { overflow-y: auto; max-height: 500px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; } 
+  th, td { text-align: left; padding: 6px 5px; border-bottom: 1px solid var(--border); } 
+  th { 
+    background: #f9fafb; font-weight: 600; color: var(--text-sub); 
+    position: sticky; top: 0; z-index: 10; 
+  }
+  tr:hover { background: #fffbe6; }
+
+  /* Overlay and Modal */
+  .overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(254, 249, 195, 0.9); z-index: 1000; 
+    display: flex; align-items: center; justify-content: center;
+  }
+  .overlay-box {
+    background: white; padding: 30px; border-radius: 16px;
+    width: 90%; max-width: 350px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center; z-index: 2000;
+  }
+  .modal-content {
+    background: white; padding: 20px; border-radius: 12px;
+    width: 90%; max-width: 700px; 
+    max-height: 90vh; overflow-y: auto;
+  }
+
+  /* 业务切换栏 */
+  .business-switcher {
+    display: flex; gap: 5px; margin-bottom: 15px;
+    background: #e5e7eb; padding: 5px; border-radius: 8px;
+  }
+  .business-switcher button {
+    flex: 1; background: transparent; color: var(--text-main); padding: 6px 12px; font-weight: 500;
+  }
+  .business-switcher button.active {
+    background: var(--primary); color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+  
+  /* Dashboard Card Link */
+  .dash-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .dash-card { flex: 1; background: #fffbe6; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #fde68a; cursor: pointer; transition: background 0.2s;}
+  .dash-card:hover { background: #fef3c7; }
+  .dash-val { font-size: 20px; font-weight: bold; color: var(--text-main); margin-top: 5px; }
+
+</style>
+</head>
+<body>
+
+<div id="layer-import" class="overlay">
+  <div class="overlay-box">
+    <h2 style="color:var(--gold); margin-bottom:5px;">永鑫贸易合作社有限公司</h2>
+    <h3 style="color:var(--gold); border-bottom:none; margin-bottom:20px;">AlwaysGold Sdn. Bhd.</h3>
+    <p style="color:var(--text-sub); margin-bottom:20px;">请导入 JSON 备份启动系统</p>
+    <button class="primary" onclick="triggerImport()">📂 导入 JSON 备份文件</button>
+    <input type="file" id="file-import" accept=".json" class="hidden" onchange="handleFileImport(this)">
+  </div>
+</div>
+
+<div id="layer-login" class="overlay hidden">
+  <div class="overlay-box">
+    <h2 style="color:var(--gold); margin-bottom:5px;">永鑫贸易合作社有限公司</h2>
+    <h3 style="color:var(--gold); border-bottom:none; margin-bottom:20px;">AlwaysGold Sdn. Bhd.</h3>
+    <h4 style="margin-top:-10px;">用户登录</h4>
+    <div style="text-align:left; margin-top:15px;">
+      <label>用户名</label>
+      <input type="text" id="login-user-input">
+      <div style="height:10px;"></div>
+      <label>密码</label>
+      <input type="password" id="login-pass" onkeyup="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="primary" style="width:100%; margin-top:20px;" onclick="doLogin()">登录系统</button>
+    <p id="login-msg" style="color:var(--danger); font-size:12px; margin-top:10px;"></p>
+  </div>
+</div>
+
+<div id="app" class="container hidden">
+  
+  <div class="top-bar">
+    <div>
+      <h2 style="margin:0;">AG 贸易现金流报表 — V6.7</h2>
+      <span style="font-size:12px; color:#666;">
+        副标题：权限隔离 · 报表联动 · 审计留痕 · 本地保存<br>
+        操作人: <b id="display-user"></b>
+      </span>
+    </div>
+    <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
+      <button class="secondary sm" onclick="showManager()">👤 管理人员</button>
+      <button class="secondary sm" onclick="triggerImportBtn()">📂 导入 JSON</button>
+      <input type="file" id="file-import-btn" accept=".json" class="hidden" onchange="handleFileImport(this)">
+      <button class="secondary sm" onclick="exportJSON()">💾 导出 JSON</button>
+      <button class="secondary sm" onclick="exportCSV()">📄 导出 CSV</button>
+      <button class="secondary sm" onclick="exportPDF()">📄 导出 PDF</button>
+      <button class="danger sm" onclick="systemReset()">⚠️ 系统重置</button>
+      <button class="secondary sm" onclick="doLogout()">退出</button>
+    </div>
+  </div>
+  
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <h3>财务概览 & 报表分析 (按日期筛选)</h3>
+        
+        <div style="display:flex; gap:5px; align-items:center; background:#f3f4f6; padding:5px; border-radius:8px;">
+            <label style="margin:0;">起始日期</label>
+            <input type="date" id="dash-start" style="width:130px;" onchange="renderApp()">
+            <span style="color:#999; margin:0 5px;">至</span>
+            <label style="margin:0;">结束日期</label>
+            <input type="date" id="dash-end" style="width:130px;" onchange="renderApp()">
+            <button class="primary sm" style="height:34px;" onclick="renderApp()">🔍 查询</button>
+            
+            <div style="width:1px; height:20px; background:#ddd; margin:0 5px;"></div>
+            <button class="secondary sm" id="btn-rpt-day" onclick="setDateRange('day')">今日</button>
+            <button class="secondary sm" id="btn-rpt-week" onclick="setDateRange('week')">本周</button>
+            <button class="secondary sm" id="btn-rpt-month" onclick="setDateRange('month')">本月</button>
+        </div>
+    </div>
+    <div class="dash-grid" style="margin-top:15px;">
+      <div class="dash-card" id="card-in"><div>收入</div><div class="dash-val" id="rpt-in" style="color:var(--success)">0.00</div></div>
+      <div class="dash-card" id="card-out"><div>支出</div><div class="dash-val" id="rpt-out" style="color:var(--danger)">0.00</div></div>
+      <div class="dash-card" id="card-net"><div>净现金流</div><div class="dash-val" id="rpt-net">0.00</div></div>
+    </div>
+  </div>
+
+
+  <div class="card" id="quick-action-card">
+    <h3>快速操作</h3>
+    <div class="action-bar">
+      <button class="action-btn secondary" onclick="setMode('IN')">💰 收入</button>
+      <button class="action-btn secondary" onclick="setMode('OUT')">💸 支出</button>
+      <button class="action-btn secondary" onclick="setMode('AR_ADD')">📝 应收(挂账)</button>
+      <button class="action-btn teal" onclick="setMode('AR_GET')">✅ 收应收</button>
+      <button class="action-btn secondary" onclick="setMode('AP_ADD')">📝 应付(赊账)</button>
+      <button class="action-btn danger" onclick="setMode('AP_PAY')">🧧 支付应付</button>
+      <button class="action-btn secondary" onclick="setMode('TRANSFER')">🔄 转账</button>
+      <button class="action-btn secondary" style="margin-left:auto;" onclick="setMode('OPEN_ACC')">➕ 开户</button>
+    </div>
+    <div id="action-form" style="background:#f9fafb; padding:15px; border-radius:8px; border:1px solid #e5e7eb;">
+      <h4 id="form-title" style="color:var(--primary); margin-bottom:10px;">请选择操作...</h4>
+      <div id="form-inputs" class="row"></div>
+      <div style="margin-top:10px; text-align:right;">
+        <button id="btn-submit" class="primary hidden" onclick="submitTransaction()">确认提交 (Enter)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>账户列表 (按业务分组)</h3>
+    <p style="font-size:12px; color:#999; margin-top:-10px; margin-bottom:10px;">提示：点击账户筛选明细，按住卡片可进行拖拽排序。管理员可管理账户。</p>
+    <div class="acc-scroll" id="acc-list-container"></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+      <h3>账目明细 (当前权限可见范围)</h3> 
+      <div class="row" style="flex:1; max-width:400px; margin-left:auto;">
+          <div class="col" style="min-width:150px;"><label>搜索</label><input type="text" id="search-input" placeholder="搜索说明/账户名..." onkeyup="renderLedger()"></div>
+          <div class="col" style="min-width:150px; flex:0 0 auto; display:flex; gap:5px;">
+              <button class="secondary sm" style="align-self:flex-end;" onclick="clearAllFilters()">清空</button>
+              <button class="danger sm" id="btn-delete-all" onclick="deleteAllRecords()">删除全部</button>
+          </div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table id="ledger-table">
+        <thead>
+          <tr>
+            <th style="width:10%;">日期</th>
+            <th style="width:8%;">类型</th>
+            <th style="width:25%;">说明</th>
+            <th style="width:10%;">主账户</th>
+            <th style="width:10%;">对方账户</th>
+            <th style="width:9%; color:var(--success)">收入</th>
+            <th style="width:9%; color:var(--danger)">支出</th>
+            <th style="width:9%;">操作人</th>
+            <th style="width:10%;">管理</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="modal-mgr" class="modal hidden">
+  <div class="modal-content" style="max-width:750px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3>人员权限管理 (仅限管理员)</h3>
+        <p style="font-size:11px; color:var(--danger); margin:0;">⚠️ 密码建议长度 ≥ 6 位</p>
+        <button class="secondary sm" onclick="document.getElementById('modal-mgr').classList.add('hidden')">关闭</button>
+    </div>
+    
+    <div style="background:#f3f4f6; padding:15px; border-radius:8px; margin-bottom:15px; margin-top:10px;">
+      <h4 style="margin-top:0;">添加新用户 / 权限设置</h4>
+      <div class="row">
+        <div class="col" style="min-width:120px;"><label>姓名</label><input id="new-u-name" placeholder="姓名"></div>
+        <div class="col" style="min-width:120px;"><label>用户名</label><input id="new-u-user" placeholder="登录用户名"></div>
+        <div class="col" style="min-width:140px;"><label>角色</label>
+          <select id="new-u-role">
+            <option value="admin">系统管理员 (全权)</option>
+            <option value="accountant">会计 (限制修改/无删除)</option>
+            <option value="shareholder">股东 (只读指定业务)</option>
+            <option value="agent">区代理 (只读指定区域)</option>
+          </select>
+        </div>
+        <div class="col" style="min-width:120px;"><label>密码</label><input id="new-u-pass" type="password" placeholder="设置新密码"></div>
+      </div>
+      
+      <div class="row" style="margin-top:10px;">
+         <div class="col"><label>备注详情 (如: KCH区EMART 会计)</label><input id="new-u-remark" placeholder="输入职位或地区详情..."></div>
+      </div>
+
+      <div style="margin-top:15px; border-top:1px dashed #ddd; padding-top:10px;">
+        <label style="margin-bottom:8px; font-weight:600;">允许查看的账目范围 (管理员默认全部):</label>
+        <div id="permission-checkboxes" style="display:flex; gap:20px; flex-wrap:wrap; font-size:13px;">
+          <label><input type="checkbox" class="perm-check" value="trade"> 贸易业务</label>
+          <label><input type="checkbox" class="perm-check" value="transport"> 运输业务</label>
+          <label><input type="checkbox" class="perm-check" value="plantation"> 种植业务</label>
+          <label><input type="checkbox" class="perm-check" value="cash_bank"> 现金/银行(日常)</label>
+          <label><input type="checkbox" class="perm-check" value="other"> 其他/杂项</label>
+        </div>
+      </div>
+
+      <button class="primary" style="width:100%; margin-top:15px;" onclick="addUser()">保存用户设置</button>
+    </div>
+    
+    <div style="max-height:300px; overflow-y:auto; border: 1px solid var(--border); border-radius: 8px;">
+        <table id="user-table"><thead><tr><th style="width:30%;">姓名 (用户名)</th><th style="width:40%;">角色/权限备注</th><th style="width:20%;">密码</th><th style="width:10%;">操作</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="modal-edit" class="modal hidden">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="edit-modal-title">编辑交易记录 (ID: <span id="edit-entry-id"></span>)</h3>
+        <button class="secondary sm" onclick="document.getElementById('modal-edit').classList.add('hidden')">关闭</button>
+    </div>
+    <div class="row">
+        <div class="col"><label>日期</label><input type="date" id="edit-date"></div>
+        <div class="col"><label>类型</label><select id="edit-type"></select></div>
+        <div class="col"><label>损益类别</label><select id="edit-plCategory"></select></div>
+        <div class="col"><label>说明</label><input type="text" id="edit-desc"></div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+        <div class="col"><label>主账户</label><select id="edit-mainId"></select></div>
+        <div class="col"><label>对方账户</label><select id="edit-otherId"></select></div>
+        <div class="col"><label style="color:var(--success)">收入 (Income)</label><input type="number" id="edit-income" value="0" min="0" step="0.01"></div>
+        <div class="col"><label style="color:var(--danger)">支出 (Expense)</label><input type="number" id="edit-expense" value="0" min="0" step="0.01"></div>
+    </div>
+    <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border); padding-top: 10px;">
+        <p style="font-size:12px; color:var(--text-sub);">原操作人: <span id="edit-original-operator"></span> | 最后编辑: <span id="edit-last-edit"></span></p>
+        <div>
+            <button class="danger" id="btn-delete-entry">彻底删除</button>
+            <button class="primary" onclick="submitEdit()">保存修改</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= SYSTEM CORE V6.7 (开户类型联动修正) ================= */
+let DB = { version: "6.7", users: [], accounts: [], entries: [] };
+let currentUser = null;
+let currentMode = null;
+let editingEntryId = null; 
+let currentAccountFilterId = null; 
+
+const GROUPS = { 
+  cash_bank: "现金与银行 (日常)", 
+  trade: "贸易业务", 
+  transport: "运输业务", 
+  plantation: "种植业务", 
+  other: "其他 (杂项)" 
+};
+const KINDS = { 
+  market: "超市", canteen: "食堂", supplier: "供应商", partner: "合作商", 
+  staff: "员工", customer: "客户群", bank: "银行", cash: "现金" 
+};
+const ROLES = {
+    admin: "系统管理员",
+    accountant: "会计",
+    shareholder: "股东",
+    agent: "区代理"
+};
+const DEFAULT_PERMS = ['cash_bank', 'trade', 'transport', 'plantation', 'other'];
+
+const PL_CATEGORIES = {
+  'INC_SALE': '主营业务收入', 'INC_OTHER': '其他收入/杂项',
+  'EXP_COST': '采购/成本', 'EXP_SALARY': '薪资/人力成本',
+  'EXP_RENT': '租金/辦公费用', 'EXP_TRAVEL': '差旅费',
+  'EXP_UTILITY': '水电煤网费', 'EXP_MAINT': '維修保养费',
+  'EXP_TAX': '税费', 'EXP_OTHER': '其他支出/杂项'
+};
+
+function init() {
+  const saved = localStorage.getItem("AG_TRADE_DB_V5"); // 保持旧的存储键名以兼容旧数据
+  if (saved) {
+    try {
+      DB = JSON.parse(saved);
+      convertOldData(DB); // 运行数据升级/初始化
+      
+      if(!DB.users || DB.users.length===0 || !DB.users.some(u => u.role === 'admin')) { 
+        DB.users = [{id:uuid(), name:"Ivy Thien", username:"IVY1019", password:"000000", role:"admin", remark: "初始管理员", allowedGroups: DEFAULT_PERMS}];
+        saveDB(); 
+      }
+      showLogin();
+    } catch(e) { showImportLayer(); }
+  } else {
+    DB.users = [{id:uuid(), name:"Ivy Thien", username:"IVY1019", password:"000000", role:"admin", remark: "初始管理员", allowedGroups: DEFAULT_PERMS}];
+    saveDB(); 
+    showLogin();
+  }
+}
+
+/**
+ * V6.7 核心：数据升级与初始化，确保 LY/LN 分组正确
+ */
+function convertOldData(db) {
+  let changed = false;
+  
+  // 1. 确保版本号更新时进行必要的字段初始化
+  if (!db.version || db.version !== "6.7") {
+    
+    // 初始化/升级用户数据
+    db.users.forEach(u => {
+      if (!u.role) u.role = u.username.toLowerCase().includes('admin') ? 'admin' : 'shareholder';
+      if (!u.remark) u.remark = ROLES[u.role] || u.role;
+      if (!u.allowedGroups) {
+          u.allowedGroups = u.role === 'admin' ? DEFAULT_PERMS : ['cash_bank', 'trade'];
+      }
+    });
+
+    // 初始化/升级交易记录
+    db.entries.forEach(e => {
+      if (!e.plCategory) e.plCategory = '';
+      if (!e.editedAt) e.editedAt = '';
+      e.income = parseFloat((e.income || 0).toFixed(2));
+      e.expense = parseFloat((e.expense || 0).toFixed(2));
+    });
+
+    db.version = "6.7";
+    changed = true;
+  }
+  
+  // 2. 确保所有账户都有 group 字段 (兼容旧数据)
+  db.accounts.forEach(acc => {
+      if (!acc.group) {
+        if (acc.kind === 'bank' || acc.kind === 'cash') acc.group = 'cash_bank';
+        else if (['supplier', 'customer', 'partner', 'staff', 'market', 'canteen'].includes(acc.kind)) acc.group = 'trade'; 
+        else acc.group = 'other';
+      }
+  });
+
+  // 3. V6.6/V6.7 核心修正：强制将名称包含 LY/LN 的账户归到贸易业务 (Trade)
+  db.accounts.forEach(acc => {
+      const accNameUpper = acc.name.toUpperCase();
+      // 检查名称是否包含 LY 或 LN
+      const isLY_LN = accNameUpper.includes('LY') || accNameUpper.includes('LN');
+      
+      // 避免修改到现金/银行账户，且确保 LY/LN 账户被归类到 trade
+      if (isLY_LN && acc.group !== 'cash_bank') {
+          if (acc.group !== 'trade') {
+              acc.group = 'trade';
+              changed = true;
+          }
+          // 额外的修正：如果 LY/LN 账户类型是 staff/customer/market/canteen，也应视为 partner/supplier 类型的贸易伙伴
+          if (acc.kind !== 'partner' && acc.kind !== 'supplier') {
+              acc.kind = 'partner'; // 将其归类为 partner 更合适
+              changed = true;
+          }
+      }
+      // 确保新加入的 market/canteen 账户也被正确归组
+      if (['market', 'canteen'].includes(acc.kind) && acc.group !== 'trade') {
+          acc.group = 'trade';
+          changed = true;
+      }
+  });
+
+  if (changed) saveDB();
+}
+
+function saveDB() { localStorage.setItem("AG_TRADE_DB_V5", JSON.stringify(DB)); }
+function uuid() { return 'id'+Date.now()+Math.floor(Math.random()*1000); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function formatDateTime(isoString) {
+    if (!isoString) return '无';
+    const date = new Date(isoString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+}
+function formatAmount(num) {
+    return (num || 0).toFixed(2);
+}
+// V6.5 新增：用于快速设置日期并触发查询
+function setDateRange(range) {
+    let startStr = "", endStr = "";
+    const now = new Date();
+    
+    if(range==='day') { startStr = today(); endStr = today(); } 
+    else if(range==='month') { startStr = now.toISOString().slice(0,7) + '-01'; endStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]; } 
+    else if(range==='week') { const d = new Date(); const dayOfWeek = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dayOfWeek); startStr = d.toISOString().split('T')[0]; d.setDate(d.getDate() + 6); endStr = d.toISOString().split('T')[0]; }
+    
+    document.getElementById('dash-start').value = startStr;
+    document.getElementById('dash-end').value = endStr;
+    renderApp();
+}
+
+/* ================= LOGIN & UI ================= */
+function showImportLayer() { 
+  document.getElementById('layer-import').classList.remove('hidden'); 
+  document.getElementById('layer-login').classList.add('hidden');
+}
+function triggerImport() { document.getElementById('file-import').click(); }
+function triggerImportBtn() { document.getElementById('file-import-btn').click(); }
+function handleFileImport(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const json = JSON.parse(e.target.result);
+      DB.users = json.users || [];
+      DB.accounts = json.accounts || [];
+      DB.entries = json.entries || [];
+      convertOldData(DB);
+      saveDB(); alert("导入成功"); location.reload();
+    } catch(e) { alert("文件无效"); }
+  };
+  reader.readAsText(file);
+}
+
+function showLogin() {
+  document.getElementById('layer-import').classList.add('hidden');
+  document.getElementById('layer-login').classList.remove('hidden');
+  document.getElementById('login-user-input').value = ""; 
+  document.getElementById('login-pass').value = "";
+  document.getElementById('login-user-input').focus();
+}
+
+function doLogin() {
+  const uNameInput = document.getElementById('login-user-input').value.trim();
+  const passInput = document.getElementById('login-pass').value.trim();
+  const u = DB.users.find(x => x.username.toLowerCase() === uNameInput.toLowerCase() && x.password === passInput);
+  
+  if(u) {
+    currentUser = u;
+    const userRoleText = ROLES[u.role] || u.role;
+    const remarkText = u.remark ? ` (${u.remark})` : '';
+    document.getElementById('display-user').textContent = `${u.name} (${userRoleText})${remarkText}`;
+    document.getElementById('layer-login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    setDateRange('day'); // 默认显示今日数据
+    updateUIPermissions(); 
+  } else document.getElementById('login-msg').textContent = "用户名或密码错误";
+}
+
+function doLogout() { currentUser=null; location.reload(); }
+function systemReset() { 
+  if (currentUser.role !== 'admin') return alert('权限不足：只有系统管理员可以重置系统。');
+  if(!confirm("⚠️ 警告：您确定要彻底重置系统吗？此操作将清空所有数据！")) return;
+  localStorage.removeItem("AG_TRADE_DB_V5");
+  location.reload();
+}
+
+function renderApp() {
+  const start = document.getElementById('dash-start').value;
+  const end = document.getElementById('dash-end').value;
+
+  renderAccounts();
+  renderReport(start, end); 
+  renderLedger(start, end);
+}
+
+/**
+ * V6.6 核心：根据用户角色和权限过滤 UI 元素
+ */
+function updateUIPermissions() {
+    const isEditor = currentUser.role === 'admin' || currentUser.role === 'accountant';
+    const isAdmin = currentUser.role === 'admin';
+    const isViewer = currentUser.role === 'shareholder' || currentUser.role === 'agent';
+    
+    // 1. 快速操作卡片
+    document.getElementById('quick-action-card').style.display = isEditor ? 'block' : 'none';
+    
+    // 2. 顶部管理按钮
+    document.querySelectorAll('.top-bar button').forEach(btn => {
+        const text = btn.textContent;
+        if (text.includes('系统重置') || text.includes('管理人员')) {
+             btn.style.display = isAdmin ? 'inline-block' : 'none';
+        }
+    });
+
+    // 3. 账目明细操作按钮
+    document.getElementById('btn-delete-all').style.display = isAdmin ? 'inline-block' : 'none';
+}
+
+/**
+ * V6.6 核心：检查用户是否有权查看该 Group 的交易或账户
+ */
+function canUserViewGroup(groupKey) {
+    if (currentUser.role === 'admin') return true; 
+    
+    if (!currentUser.allowedGroups) return false;
+    
+    return currentUser.allowedGroups.includes(groupKey);
+}
+
+function getAccountIdsInFilter() {
+    return DB.accounts.filter(a => canUserViewGroup(a.group)).map(a => a.id);
+}
+
+/* ================= 账户列表 (V6.6: 权限过滤) ================= */
+let dragSrcEl = null;
+
+function renderAccounts() {
+  const container = document.getElementById('acc-list-container');
+  container.innerHTML = '';
+  const groupedAccounts = {};
+  
+  // 初始化所有组
+  Object.keys(GROUPS).forEach(k => groupedAccounts[k] = []);
+  
+  // 仅显示有权限查看的账户
+  DB.accounts.forEach(acc => {
+    const groupKey = acc.group; 
+    if (canUserViewGroup(groupKey)) {
+      if (!groupedAccounts[groupKey]) groupedAccounts[groupKey] = [];
+      groupedAccounts[groupKey].push(acc);
+    }
+  });
+
+  Object.keys(GROUPS).forEach(groupKey => {
+    const list = groupedAccounts[groupKey];
+    if (!list || list.length === 0) return;
+    
+    const div = document.createElement('div');
+    div.className = 'acc-group';
+    div.dataset.group = groupKey; 
+    div.innerHTML = `<h4>${GROUPS[groupKey] || groupKey} (${list.length})</h4>`;
+    
+    list.forEach(acc => {
+      const item = document.createElement('div');
+      item.className = 'acc-item';
+      if (acc.id === currentAccountFilterId) item.classList.add('selected'); 
+      item.draggable = (currentUser.role === 'admin'); // 只有管理员能拖拽
+      item.dataset.id = acc.id;
+      item.dataset.group = acc.group; 
+      
+      let controlsHtml = '';
+      const canEdit = currentUser.role === 'admin' || currentUser.role === 'accountant';
+      const canDelete = currentUser.role === 'admin';
+      
+      if (canEdit) {
+          controlsHtml += `<span class="btn-icon edit" onclick="editAccount('${acc.id}', event)">✎</span>`;
+      }
+      if (canDelete) {
+          controlsHtml += `<span class="btn-icon del" onclick="deleteAccount('${acc.id}', event)">×</span>`;
+      }
+      if (controlsHtml !== '') {
+          controlsHtml = `<div class="acc-controls">${controlsHtml}</div>`;
+      }
+
+      item.onclick = (e) => toggleAccountFilter(acc.id); 
+      item.innerHTML = `
+        <div style="display:flex; flex-direction:column; width:100%;">
+            <span style="font-size:12px; display:flex; justify-content:space-between;">
+                ${acc.name}
+                ${controlsHtml}
+            </span>
+            <span class="acc-bal ${acc.balance<0?'neg':''}">${formatAmount(acc.balance)}</span>
+        </div>
+      `;
+      addDragEvents(item);
+      div.appendChild(item);
+    });
+    container.appendChild(div);
+  });
+}
+
+function toggleAccountFilter(accId) {
+    if (currentAccountFilterId === accId) currentAccountFilterId = null; 
+    else currentAccountFilterId = accId;
+    renderAccounts(); renderLedger(); 
+}
+
+function editAccount(id, event) {
+    event.stopPropagation();
+    if (currentUser.role !== 'admin' && currentUser.role !== 'accountant') return alert("权限不足：只有管理员或会计可以修改账户。");
+    const acc = DB.accounts.find(a => a.id === id);
+    if (!acc) return;
+    const newName = prompt("请输入新的账户名称:", acc.name);
+    if (newName && newName.trim() !== "") {
+        acc.name = newName.trim();
+        saveDB(); renderAccounts(); renderLedger();
+    }
+}
+
+function deleteAccount(id, event) {
+    event.stopPropagation();
+    if (currentUser.role !== 'admin') return alert("权限不足：仅管理员可删除账户。");
+    
+    const acc = DB.accounts.find(a => a.id === id);
+    if (!acc) return;
+
+    const hasEntries = DB.entries.some(e => e.mainId === id || e.otherId === id);
+    if (hasEntries) {
+        return alert(`无法删除账户 "${acc.name}"，因为它包含交易记录。`);
+    }
+
+    if (confirm(`确定要删除账户 "${acc.name}" 吗？此操作不可撤销。`)) {
+        DB.accounts = DB.accounts.filter(a => a.id !== id);
+        saveDB(); renderAccounts();
+    }
+}
+
+function addDragEvents(item) {
+  item.addEventListener('dragstart', function(e) { 
+    if (currentUser.role !== 'admin') { e.preventDefault(); return; } 
+    dragSrcEl = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; 
+  });
+  item.addEventListener('dragend', function(e) { this.classList.remove('dragging'); document.querySelectorAll('.acc-item').forEach(el => el.classList.remove('drag-over')); });
+  item.addEventListener('dragover', function(e) { 
+    e.preventDefault(); 
+    if(dragSrcEl !== this && dragSrcEl.dataset.group === this.dataset.group && currentUser.role === 'admin') { 
+        this.classList.add('drag-over'); 
+    }
+    return false; 
+  });
+  item.addEventListener('drop', function(e) {
+    e.stopPropagation();
+    if (dragSrcEl !== this && dragSrcEl.dataset.group === this.dataset.group && currentUser.role === 'admin') { 
+      const srcId = dragSrcEl.dataset.id;
+      const targetId = this.dataset.id;
+      const srcIdxInFull = DB.accounts.findIndex(a => a.id === srcId);
+      const targetIdxInFull = DB.accounts.findIndex(a => a.id === targetId);
+      if(srcIdxInFull > -1 && targetIdxInFull > -1) {
+          const [movedItem] = DB.accounts.splice(srcIdxInFull, 1);
+          DB.accounts.splice(targetIdxInFull, 0, movedItem);
+          saveDB(); renderAccounts();
+      }
+    }
+    return false;
+  });
+}
+
+/* ================= 账目明细 (V6.6: 权限过滤与日期联动) ================= */
+function getAccName(id) {
+  const acc = DB.accounts.find(a => a.id === id);
+  return acc ? acc.name : (id ? '未知账户' : '-');
+}
+
+function getAccGroup(id) {
+    const acc = DB.accounts.find(a => a.id === id);
+    return acc ? acc.group : 'other'; // 默认给 other
+}
+
+function getAccTooltip(id) {
+  const acc = DB.accounts.find(a => a.id === id);
+  if (!acc || !acc.balance) return '';
+  const balanceText = `当前余额: ${formatAmount(acc.balance)}`;
+  const accTypeText = `账户类型: ${KINDS[acc.kind] || 'N/A'}`;
+  return `title="${balanceText} | ${accTypeText}" style="cursor: pointer; text-decoration: underline dotted; color: ${acc.balance < 0 ? 'var(--danger)' : 'var(--success)'};"`;
+}
+
+function renderLedger(startDate, endDate) {
+  const tbody = document.querySelector('#ledger-table tbody');
+  tbody.innerHTML = '';
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const isEditor = currentUser.role === 'admin' || currentUser.role === 'accountant';
+  
+  let filteredEntries = DB.entries.filter(e => {
+    
+    // V6.6 核心：权限过滤
+    const mainGroup = getAccGroup(e.mainId);
+    const otherGroup = getAccGroup(e.otherId);
+    
+    // 如果交易涉及的两个账户，主账户/其他账户，只要有一个在用户的允许查看范围内，则显示。
+    if (!canUserViewGroup(mainGroup) && !canUserViewGroup(otherGroup)) {
+        return false;
+    }
+
+    // V6.6 核心：日期和搜索过滤
+    if (startDate && e.date < startDate) return false;
+    if (endDate && e.date > endDate) return false;
+    
+    if (currentAccountFilterId && e.mainId !== currentAccountFilterId && e.otherId !== currentAccountFilterId) return false;
+    
+    if(search) {
+      const mainName = getAccName(e.mainId).toLowerCase();
+      const otherName = getAccName(e.otherId).toLowerCase();
+      if (!e.desc.toLowerCase().includes(search) && !mainName.includes(search) && !otherName.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filteredEntries.sort((a, b) => {
+    if (a.date < b.date) return 1; if (a.date > b.date) return -1;
+    if (a.id < b.id) return 1; if (a.id > b.id) return -1;
+    return 0;
+  });
+  
+  filteredEntries.forEach(e => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${e.date}</td>
+      <td>${e.type}</td>
+      <td>${e.desc || '-'}</td>
+      <td ${getAccTooltip(e.mainId)} onclick="toggleAccountFilter('${e.mainId}')">${getAccName(e.mainId)}</td> 
+      <td>${getAccName(e.otherId)}</td>
+      <td style="color:${e.income>0?'var(--success)':'#ccc'}">${formatAmount(e.income)}</td>
+      <td style="color:${e.expense>0?'var(--danger)':'#ccc'}">${formatAmount(e.expense)}</td>
+      <td>${e.operator}</td>
+      <td>${isEditor ? `<button class="secondary sm" onclick="showEditModal('${e.id}')">编辑</button>` : '---'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function clearAllFilters() {
+    currentAccountFilterId = null;
+    document.getElementById('search-input').value = '';
+    // 不清空 dash-start/end, 保持当前报表筛选状态
+    renderAccounts(); renderLedger();
+}
+
+function deleteAllRecords() {
+    if (currentUser.role !== 'admin') return alert('权限不足：只有系统管理员可以删除全部记录。');
+    if (!confirm("⚠️ 警告：您确定要删除当前所有账目记录吗？此操作不可逆！")) return;
+    DB.entries.forEach(e => reverseTransactionEffect(e)); 
+    DB.entries = [];
+    saveDB(); renderApp();
+}
+
+/* ================= 编辑系统 ================= */
+function showEditModal(entryId) {
+  if (currentUser.role !== 'admin' && currentUser.role !== 'accountant') return alert('您的角色无权进行交易修改操作。');
+  
+  const entry = DB.entries.find(e => e.id === entryId);
+  if (!entry) return alert('记录不存在');
+  
+  // V6.6 权限检查：确保用户有权限编辑这条记录
+  const mainGroup = getAccGroup(entry.mainId);
+  const otherGroup = getAccGroup(entry.otherId);
+  if (!canUserViewGroup(mainGroup) && !canUserViewGroup(otherGroup)) {
+      return alert('权限不足：您无权编辑涉及此业务组的交易记录。');
+  }
+
+  editingEntryId = entryId;
+
+  document.getElementById('edit-entry-id').textContent = entryId;
+  document.getElementById('edit-date').value = entry.date;
+  document.getElementById('edit-desc').value = entry.desc || '';
+  document.getElementById('edit-income').value = formatAmount(entry.income);
+  document.getElementById('edit-expense').value = formatAmount(entry.expense);
+  document.getElementById('edit-original-operator').textContent = entry.operator;
+  document.getElementById('edit-last-edit').textContent = formatDateTime(entry.editedAt);
+  
+  fillSelect('edit-type', ['收入','支出','应收增加','收应收','应付增加','支付应付','转账','期初'], entry.type);
+  fillSelect('edit-plCategory', Object.keys(PL_CATEGORIES), entry.plCategory, PL_CATEGORIES);
+  fillAccountSelect('edit-mainId', entry.mainId);
+  fillAccountSelect('edit-otherId', entry.otherId);
+
+  // 只有管理员可以删除
+  document.getElementById('btn-delete-entry').style.display = (currentUser.role === 'admin' ? 'inline-block' : 'none');
+  document.getElementById('btn-delete-entry').onclick = () => { deleteEntry(entryId); document.getElementById('modal-edit').classList.add('hidden'); };
+  document.getElementById('modal-edit').classList.remove('hidden');
+}
+
+function fillSelect(id, values, selectedValue, map = null) {
+  const select = document.getElementById(id);
+  select.innerHTML = '';
+  select.add(new Option('---', ''));
+  values.forEach(val => {
+    const text = map ? map[val] : val;
+    const option = new Option(text, val);
+    if (val === selectedValue) option.selected = true;
+    select.add(option);
+  });
+}
+
+function fillAccountSelect(id, selectedAccId) {
+  const select = document.getElementById(id);
+  select.innerHTML = '';
+  select.add(new Option('---', ''));
+  
+  DB.accounts.forEach(acc => {
+    // V6.6 权限过滤：编辑时只能选择自己能看到的账户
+    if (canUserViewGroup(acc.group) || acc.id === selectedAccId) {
+        const option = new Option(acc.name, acc.id);
+        if (acc.id === selectedAccId) option.selected = true;
+        select.add(option);
+    }
+  });
+}
+
+function submitEdit() {
+  const id = editingEntryId;
+  const entry = DB.entries.find(e => e.id === id);
+  if (!entry) return;
+
+  const newEntry = {
+    date: document.getElementById('edit-date').value,
+    type: document.getElementById('edit-type').value,
+    plCategory: document.getElementById('edit-plCategory').value,
+    desc: document.getElementById('edit-desc').value,
+    mainId: document.getElementById('edit-mainId').value,
+    otherId: document.getElementById('edit-otherId').value,
+    income: parseFloat(parseFloat(document.getElementById('edit-income').value) || 0),
+    expense: parseFloat(parseFloat(document.getElementById('edit-expense').value) || 0)
+  };
+  
+  if (!newEntry.date || !newEntry.type || !newEntry.mainId || (newEntry.income===0 && newEntry.expense===0)) return alert("请确保日期、类型、主账户、收入或支出金额已填写！");
+  
+  reverseTransactionEffect(entry); 
+  Object.assign(entry, newEntry);
+  
+  // V6.6 核心：强制审计留痕
+  let operatorText = entry.operator.replace(/ \(修改人:.*?\)/, ''); // 清理旧的编辑标记
+  if (currentUser.role === 'accountant') {
+      entry.operator = `${operatorText} (修改人: ${currentUser.name})`; 
+  } else if (currentUser.role === 'admin') {
+       entry.operator = `${operatorText} (管理员编辑)`;
+  }
+  
+  entry.editedAt = new Date().toISOString(); 
+  applyTransactionEffect(entry);
+
+  saveDB(); 
+  document.getElementById('modal-edit').classList.add('hidden');
+  renderApp();
+}
+
+function updateBalance(id, delta) {
+  if(!id) return;
+  const acc = DB.accounts.find(a => a.id === id);
+  if (acc) acc.balance = parseFloat(formatAmount(acc.balance + delta));
+}
+
+function applyTransactionEffect(e) {
+  const main = e.mainId; const other = e.otherId;
+  const inc = e.income || 0; const exp = e.expense || 0;
+  if (e.type === "收入") updateBalance(main, inc);
+  else if (e.type === "支出") updateBalance(main, -exp);
+  else if (e.type === "应收增加") updateBalance(main, inc);
+  else if (e.type === "收应收") { updateBalance(main, -inc); updateBalance(other, inc); }
+  else if (e.type === "应付增加") updateBalance(main, -exp);
+  else if (e.type === "支付应付") { updateBalance(main, exp); updateBalance(other, -exp); }
+  else if (e.type === "转账") { updateBalance(main, -exp); updateBalance(other, exp); }
+  else if (e.type === "期初") { updateBalance(main, (inc - exp)); }
+  if (e.type === "转账" && inc > 0 && exp === 0) { updateBalance(main, -inc); updateBalance(other, inc); }
+}
+
+function reverseTransactionEffect(e) {
+  const main = e.mainId; const other = e.otherId;
+  const inc = e.income || 0; const exp = e.expense || 0;
+  if (e.type === "收入") updateBalance(main, -inc);
+  else if (e.type === "支出") updateBalance(main, exp);
+  else if (e.type === "应收增加") updateBalance(main, -inc);
+  else if (e.type === "收应收") { updateBalance(main, inc); updateBalance(other, -inc); }
+  else if (e.type === "应付增加") updateBalance(main, exp);
+  else if (e.type === "支付应付") { updateBalance(main, -exp); updateBalance(other, exp); }
+  else if (e.type === "转账") { updateBalance(main, exp); updateBalance(other, -exp); }
+  else if (e.type === "期初") { updateBalance(main, -(inc - exp)); }
+  if (e.type === "转账" && inc > 0 && exp === 0) { updateBalance(main, inc); updateBalance(other, -inc); }
+}
+
+function deleteEntry(id) {
+  if (currentUser.role !== 'admin') return alert('权限不足：只有管理员可以删除交易记录。');
+  if(!confirm(`⚠️ 警告：删除记录 (${id}) 将回滚余额，确定彻底删除吗？`)) return; 
+  const idx = DB.entries.findIndex(e => e.id === id);
+  if(idx > -1) {
+    reverseTransactionEffect(DB.entries[idx]);
+    DB.entries.splice(idx, 1);
+    saveDB(); renderApp();
+  }
+}
+
+/* ================= TRANSACTION LOGIC ================= */
+// V6.7 新增：动态更新 Kind 选项
+function updateKindOptions() {
+    const groupSelect = document.getElementById('new-group');
+    const kindSelect = document.getElementById('new-kind');
+    if (!groupSelect || !kindSelect) return;
+
+    const selectedGroup = groupSelect.value;
+    let eligibleKinds = {};
+
+    if (selectedGroup === 'cash_bank') {
+        // 现金/银行组只显示 现金/银行 两种类型
+        eligibleKinds = { cash: KINDS.cash, bank: KINDS.bank };
+    } else if (selectedGroup !== '') {
+        // 其他业务组只显示 非现金/银行 的类型
+        Object.entries(KINDS).forEach(([key, name]) => {
+            if (key !== 'cash' && key !== 'bank') {
+                eligibleKinds[key] = name;
+            }
+        });
+    }
+    
+    // 重新填充 Kind Select
+    kindSelect.innerHTML = '<option value="">--- 请选择类型 ---</option>';
+    Object.entries(eligibleKinds).forEach(([key, name]) => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = name;
+        kindSelect.appendChild(option);
+    });
+    
+    // 如果只有一种有效类型（不常用，但确保逻辑完整）
+    if (Object.keys(eligibleKinds).length === 1) {
+        kindSelect.value = Object.keys(eligibleKinds)[0];
+    }
+}
+
+function setMode(mode) {
+  if (currentUser.role !== 'admin' && currentUser.role !== 'accountant') return alert('您的角色无权进行交易录入操作。');
+  
+  currentMode = mode;
+  const container = document.getElementById('form-inputs');
+  const btn = document.getElementById('btn-submit');
+  const title = document.getElementById('form-title');
+  container.innerHTML = '';
+  btn.classList.remove('hidden');
+
+  // V6.6 修正：更新 AR/AP 的账户 Kind 筛选列表
+  const IN_KINDS = ['bank','cash','customer', 'market', 'canteen']; // 收入：来自所有客户和现金/银行
+  const OUT_KINDS = ['bank','cash'];
+  const AR_KINDS = ['customer','supplier','partner', 'market', 'canteen']; // 应收：所有非银行/员工的账户
+  const AP_KINDS = ['supplier','partner', 'market', 'canteen', 'customer']; // 应付：所有非银行/员工的账户 (客户也可能被应付)
+
+  const createSelect = (id, label, filterKind) => {
+    let opts = '<option value="">--- 请选择 ---</option>';
+    
+    // V6.6: 账户列表根据用户权限过滤
+    let eligibleAccs = DB.accounts.filter(acc => canUserViewGroup(acc.group) && (!filterKind || filterKind.includes(acc.kind)));
+    eligibleAccs.sort((a, b) => a.kind.localeCompare(b.kind));
+
+    let lastKind = "";
+    eligibleAccs.forEach(acc => {
+        if (acc.kind !== lastKind) {
+            if (lastKind !== "") opts += `<option disabled>──────────</option>`;
+            opts += `<option disabled style="font-weight:bold; color:#666; font-size:12px;">-- ${KINDS[acc.kind] || acc.kind} --</option>`;
+            lastKind = acc.kind;
+        }
+        opts += `<option value="${acc.id}"> &nbsp;&nbsp; ${acc.name}</option>`;
+    });
+
+    return `<div class="col"><label>${label}</label><select id="${id}">${opts}</select></div>`;
+  };
+  
+  const createInput = (id, label, type="text") => {
+      let inputHtml = `<input id="${id}" type="${type}">`;
+      if (type === 'number') inputHtml = `<input id="${id}" type="${type}" min="0" step="0.01" value="">`;
+      return `<div class="col"><label>${label}</label>${inputHtml}</div>`;
+  };
+  
+  let html = "";
+  
+  if (mode !== 'OPEN_ACC') {
+      html = createInput('tx-date', '日期', 'date');
+  }
+
+  if(mode === 'IN') { title.innerText="💰 收入"; html += createSelect('tx-acc', '账户', OUT_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'OUT') { title.innerText="💸 支出"; html += createSelect('tx-acc', '账户', OUT_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'AR_ADD') { title.innerText="📝 应收挂账"; html += createSelect('tx-acc', '欠款人', AR_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'AR_GET') { title.innerText="✅ 收回应收"; html += createSelect('tx-acc', '还款人', AR_KINDS) + createSelect('tx-to','收款账户', OUT_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'AP_ADD') { title.innerText="📝 应付赊账"; html += createSelect('tx-acc', '债权人', AP_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'AP_PAY') { title.innerText="🧧 支付应付"; html += createSelect('tx-acc', '收款人', AP_KINDS) + createSelect('tx-to','付款账户', OUT_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'TRANSFER') { title.innerText="🔄 转账"; html += createSelect('tx-from', '转出', OUT_KINDS) + createSelect('tx-to', '转入', OUT_KINDS) + createInput('tx-amt','金额','number'); }
+  else if(mode === 'OPEN_ACC') { 
+    title.innerText="➕ 开户"; 
+    let groupOpts = '<option value="">--- 请选择分组 ---</option>';
+    // V6.6 权限过滤：开户时也只能选择自己能管理的 Group (Admin才可以看到所有)
+    Object.entries(GROUPS).forEach(([key, name]) => { 
+        if(currentUser.role === 'admin' || currentUser.allowedGroups.includes(key)) {
+            groupOpts += `<option value="${key}">${name}</option>`; 
+        }
+    });
+
+    html = createInput('new-date', '开户日期', 'date')
+    // V6.7 核心修正：添加 onchange 事件，并去除 Kind 选项的初始填充
+    + `<div class="col"><label>分组</label><select id="new-group" onchange="updateKindOptions()">${groupOpts}</select></div>` 
+    + `<div class="col"><label>类型</label><select id="new-kind"><option value="">--- 请先选择分组 ---</option></select></div>` 
+    + createInput('new-name','名称') 
+    + createInput('new-bal','初始余额','number'); 
+  }
+  
+  if(mode !== 'OPEN_ACC' && mode !== 'TRANSFER') {
+    let plOpts = '<option value="">-- 选择损益类别（必选） --</option>';
+    const filter = (mode === 'IN' || mode === 'AR_ADD' || mode === 'AR_GET') ? 'INC_' : 'EXP_'; 
+    Object.entries(PL_CATEGORIES).forEach(([key, name]) => {
+      if(key.startsWith(filter)) plOpts += `<option value="${key}">${name}</option>`;
+    });
+    html += `<div class="col" style="flex:1 1 100%;"><label>损益类别</label><select id="tx-pl-category">${plOpts}</select></div>`; 
+    html += createInput('tx-desc', '说明');
+  } else if (mode === 'TRANSFER') {
+      html += createInput('tx-desc', '说明');
+  }
+  
+  container.innerHTML = html;
+  
+  setTimeout(() => {
+    if(document.getElementById('tx-date')) document.getElementById('tx-date').value = today();
+    if(document.getElementById('new-date')) document.getElementById('new-date').value = today();
+    
+    // V6.7 核心修正：开户时调用联动函数
+    if(document.getElementById('new-group')) updateKindOptions(); 
+
+    const focusEl = document.getElementById('tx-amt') || document.getElementById('new-name');
+    if(focusEl) focusEl.focus();
+  }, 50);
+  
+  container.onkeyup = (e) => { if(e.key === 'Enter') submitTransaction(); };
+}
+
+function submitTransaction() {
+  const dateInput = document.getElementById('new-date') || document.getElementById('tx-date');
+  const date = dateInput ? dateInput.value : today();
+
+  let entry = { 
+    id: uuid(), date: date, operator: currentUser.name, // 录入时使用名字
+    type:"", desc:"", mainId:"", otherId:"", income:0, expense:0,
+    plCategory: "", editedAt: ""
+  };
+
+  if(currentMode === 'OPEN_ACC') {
+    const name = document.getElementById('new-name').value;
+    const kind = document.getElementById('new-kind').value;
+    const group = document.getElementById('new-group').value;
+    const bal = parseFloat(parseFloat(document.getElementById('new-bal').value) || 0); 
+    
+    // V6.7 修正：强制选择 Kind
+    if(!name || !group || !kind) return alert("请填写完整的开户信息 (分组和类型必须选择)。");
+
+    const newAcc = { id: uuid(), name, kind, group, balance: bal };
+    DB.accounts.push(newAcc);
+    
+    if(bal !== 0) {
+      entry.type="期初"; entry.desc="初始余额"; entry.mainId=newAcc.id; 
+      if(bal>0) entry.income=bal; else entry.expense=Math.abs(bal);
+      entry.plCategory = '期初余额';
+      DB.entries.unshift(entry);
+    }
+
+  } else {
+    const amt = parseFloat(parseFloat(document.getElementById('tx-amt').value));
+    const desc = document.getElementById('tx-desc').value;
+    const plCategory = document.getElementById('tx-pl-category') ? document.getElementById('tx-pl-category').value : '';
+
+    if(isNaN(amt) || amt<=0) return alert("金额错误或未填写。金额必须大于0。");
+    if(!plCategory && currentMode !== 'TRANSFER') return alert("请选择损益类别");
+    
+    entry.desc = desc;
+    entry.plCategory = plCategory;
+
+    const main = document.getElementById('tx-acc') ? document.getElementById('tx-acc').value : document.getElementById('tx-from').value;
+    const other = document.getElementById('tx-to') ? document.getElementById('tx-to').value : "";
+    
+    if(!main) return alert("请选择账户！");
+    if(currentMode === 'TRANSFER' && !other) return alert("请选择转入账户！");
+
+    entry.mainId = main; entry.otherId = other;
+    
+    if(currentMode==='IN') { entry.type="收入"; entry.income=amt; updateBalance(main, amt); }
+    else if(currentMode==='OUT') { entry.type="支出"; entry.expense=amt; updateBalance(main, -amt); }
+    else if(currentMode==='AR_ADD') { entry.type="应收增加"; entry.income=amt; updateBalance(main, amt); }
+    else if(currentMode==='AR_GET') { entry.type="收应收"; entry.income=amt; updateBalance(main, -amt); updateBalance(other, amt); }
+    else if(currentMode==='AP_ADD') { entry.type="应付增加"; entry.expense=amt; updateBalance(main, -amt); }
+    else if(currentMode==='AP_PAY') { entry.type="支付应付"; entry.expense=amt; updateBalance(main, amt); updateBalance(other, -amt); }
+    else if(currentMode==='TRANSFER') { entry.type="转账"; entry.expense=amt; updateBalance(main, -amt); updateBalance(other, amt); }
+    
+    DB.entries.unshift(entry);
+  }
+  
+  saveDB(); renderApp();
+
+  // 自动归零和重置
+  if(document.getElementById('tx-amt')) document.getElementById('tx-amt').value = '';
+  if(document.getElementById('tx-desc')) document.getElementById('tx-desc').value = '';
+  if(document.getElementById('new-name')) document.getElementById('new-name').value = '';
+  if(document.getElementById('new-bal')) document.getElementById('new-bal').value = '';
+  
+  if(document.getElementById('tx-date')) document.getElementById('tx-date').value = today();
+  if(document.getElementById('new-date')) document.getElementById('new-date').value = today();
+
+  ['tx-acc', 'tx-from', 'tx-to', 'tx-pl-category'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.value = "";
+  });
+
+  const focusEl = document.getElementById('tx-acc') || document.getElementById('tx-from') || document.getElementById('new-name');
+  if(focusEl) focusEl.focus();
+
+  const btn = document.getElementById('btn-submit');
+  btn.innerText = "已保存 ✔";
+  setTimeout(()=> btn.innerText="确认提交 (Enter)", 1000);
+}
+
+/* ================= REPORT & EXPORT (V6.6: 权限过滤与日期联动) ================= */
+function renderReport(startStr, endStr) {
+  let tin=0, tout=0;
+  
+  // V6.6: 移除 reportFilter，现在根据 dash-start/end 来计算
+  document.querySelectorAll('.card > div:first-child > div:last-child button').forEach(btn => {
+      btn.classList.remove('primary'); btn.classList.add('secondary');
+  });
+
+  if (!startStr || !endStr) {
+      document.getElementById('rpt-in').innerText = '0.00';
+      document.getElementById('rpt-out').innerText = '0.00';
+      document.getElementById('rpt-net').innerText = '0.00';
+      return;
+  }
+  
+  // 识别当前点击的快捷按钮，并高亮
+  const today = new Date().toISOString().split('T')[0];
+  const startMonth = new Date(startStr).toISOString().slice(0,7);
+  if(startStr === today && endStr === today) {
+      document.getElementById('btn-rpt-day').classList.add('primary');
+  } else if (startStr.endsWith('-01') && new Date(endStr).toISOString().slice(0,7) === startMonth) {
+      document.getElementById('btn-rpt-month').classList.add('primary');
+  } // 暂不处理周，避免复杂性
+
+  
+  DB.entries.forEach(e => {
+    // V6.6 核心：权限过滤
+    const mainGroup = getAccGroup(e.mainId);
+    const otherGroup = getAccGroup(e.otherId);
+    if (!canUserViewGroup(mainGroup) && !canUserViewGroup(otherGroup)) {
+        return; // 跳过无权查看的交易
+    }
+    
+    if (e.date >= startStr && e.date <= endStr && e.type !== '转账' && e.type !== '期初' && !e.type.includes('增加')) {
+        tin += (e.income||0); tout += (e.expense||0);
+    }
+  });
+
+  document.getElementById('rpt-in').innerText = formatAmount(tin);
+  document.getElementById('rpt-out').innerText = formatAmount(tout);
+  document.getElementById('rpt-net').innerText = formatAmount(tin-tout);
+}
+
+
+function exportJSON() {
+  if (currentUser.role !== 'admin') return alert('权限不足：只有系统管理员可以导出 JSON。');
+  const blob = new Blob([JSON.stringify(DB, null, 2)], {type: "application/json"});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `AG_Backup_${today()}_V6_7.json`;
+  a.click();
+}
+
+function exportCSV() {
+    const header = ["日期", "类型", "说明", "损益类别", "主账户", "对方账户", "收入", "支出", "操作人", "最后编辑时间", "交易ID"];
+    const entriesData = DB.entries.map(e => ({ ...e, mainAccName: getAccName(e.mainId), otherAccName: getAccName(e.otherId), plCategoryName: PL_CATEGORIES[e.plCategory] || e.plCategory || '-', mainGroup: getAccGroup(e.mainId), otherGroup: getAccGroup(e.otherId) }));
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const startDate = document.getElementById('dash-start').value;
+    const endDate = document.getElementById('dash-end').value;
+
+    const filteredForExport = entriesData.filter(e => {
+        // V6.6 核心：权限过滤 (导出数据也按权限)
+        if (!canUserViewGroup(e.mainGroup) && !canUserViewGroup(e.otherGroup)) return false;
+
+        if (currentAccountFilterId && e.mainId !== currentAccountFilterId && e.otherId !== currentAccountFilterId) return false;
+        if (startDate && e.date < startDate) return false;
+        if (endDate && e.date > endDate) return false;
+        if(search) {
+            if (!e.desc.toLowerCase().includes(search) && !e.mainAccName.toLowerCase().includes(search) && !e.otherAccName.toLowerCase().includes(search)) return false;
+        }
+        return true;
+    });
+
+    const csvData = filteredForExport.map(e => [
+        e.date, e.type, e.desc || '', e.plCategoryName, e.mainAccName, e.otherAccName, formatAmount(e.income), formatAmount(e.expense), e.operator, formatDateTime(e.editedAt), e.id
+    ]);
+
+    const csv = Papa.unparse({ fields: header, data: csvData });
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }); 
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `AG_Ledger_Export_${today()}.csv`;
+    a.click();
+}
+
+function exportPDF() {
+    alert("PDF 导出功能已禁用，请使用 CSV 导出以避免乱码问题。");
+    return;
+  /*
+  const { jsPDF } = window.jspdf;
+  // 由于 PDF 字体问题复杂，此处仅保留逻辑框架，建议使用 CSV 导出。
+  */
+}
+
+/* ================= MANAGER (V6.6: 权限设置与备注) ================= */
+function showManager() { 
+  if (currentUser.role !== 'admin') return alert('权限不足：只有系统管理员可以访问用户管理！');
+  document.getElementById('modal-mgr').classList.remove('hidden'); 
+  renderUsers(); 
+}
+
+function renderUsers() {
+    const tbody = document.querySelector('#user-table tbody'); tbody.innerHTML='';
+    DB.users.forEach(u => {
+        const isSelf = u.id === currentUser.id;
+        
+        // 渲染权限复选框
+        const checkboxHtml = Object.keys(GROUPS).map(groupKey => {
+            const isChecked = u.allowedGroups && u.allowedGroups.includes(groupKey);
+            return `<label style="display:block; margin: 3px 0;"><input type="checkbox" data-group="${groupKey}" ${isChecked ? 'checked' : ''} ${u.role === 'admin' ? 'disabled' : ''} onchange="updateUserPermissions('${u.id}', this)"> ${GROUPS[groupKey]}</label>`;
+        }).join('');
+
+        const nameDisplay = `<span style="font-weight:600;">${u.name}</span> <span style="font-size:11px; color:#666;">(${u.username})</span>`;
+        const passInput = `<input type="password" id="user-pass-${u.id}" placeholder="****** (输入以修改)" onchange="updateUser('${u.id}', 'password', this.value)">`;
+        const canDelete = !isSelf && u.role !== 'admin'; // 管理员不能删除自己，也不能删除其他管理员
+
+        tbody.innerHTML += `
+        <tr>
+            <td>${nameDisplay}</td>
+            <td>
+                <span style="font-weight:500; font-size:13px;">${ROLES[u.role] || u.role}</span>
+                <span style="font-size:11px; color:var(--primary); display:block;">${u.remark || '无备注'}</span>
+                
+                <details style="margin-top:5px; padding:5px; background:#f0f0f0; border-radius:4px;">
+                    <summary style="cursor:pointer; font-size:11px; color:#333;">权限范围</summary>
+                    <div style="font-size:10px; margin-top:5px;">${checkboxHtml}</div>
+                </details>
+            </td>
+            <td>${passInput}</td>
+            <td>${canDelete ? `<button class="danger sm" onclick="delUser('${u.id}')">删除</button>` : '---'}</td>
+        </tr>`;
+    });
+}
+
+function updateUser(id, field, value) {
+    const user = DB.users.find(u => u.id === id);
+    if (!user) return;
+    const trimmedValue = value.trim();
+    if(field === 'password') {
+        if (trimmedValue === '') return; 
+        if (trimmedValue.length < 6) { alert("密码长度至少需要 6 位字符！"); renderUsers(); return; }
+        user[field] = trimmedValue; 
+    } else { user[field] = trimmedValue; }
+    saveDB();
+    if (currentUser.id === id) location.reload(); // 更改自身角色/名称需要重新登录或刷新
+}
+
+// V6.6 新增：批量更新用户权限
+function updateUserPermissions(id, checkbox) {
+    if (currentUser.role !== 'admin') return alert('权限不足：只有管理员可以修改权限。');
+    const user = DB.users.find(u => u.id === id);
+    if (!user || user.role === 'admin') return;
+
+    const groupKey = checkbox.dataset.group;
+    if (checkbox.checked) {
+        if (!user.allowedGroups.includes(groupKey)) user.allowedGroups.push(groupKey);
+    } else {
+        user.allowedGroups = user.allowedGroups.filter(g => g !== groupKey);
+    }
+    saveDB();
+    if (user.id === currentUser.id) {
+        // 如果是修改自己的权限，需要重新渲染整个应用
+        renderApp();
+    }
+}
+
+
+function addUser() {
+  const name=document.getElementById('new-u-name').value.trim();
+  const user=document.getElementById('new-u-user').value.trim();
+  const pass=document.getElementById('new-u-pass').value.trim();
+  const role=document.getElementById('new-u-role').value;
+  const remark=document.getElementById('new-u-remark').value.trim(); // V6.6: 获取备注
+  
+  if(!name || !user || !pass || !role) return alert("请填写完整的用户信息");
+  if(DB.users.some(u => u.username.toLowerCase() === user.toLowerCase())) return alert("用户名已存在！");
+  if(pass.length < 6) return alert("密码长度至少需要 6 位字符！"); 
+
+  // V6.6: 获取勾选的权限
+  let perms = [];
+  document.querySelectorAll('#permission-checkboxes input:checked').forEach(cb => perms.push(cb.value));
+  
+  // 管理员强制拥有所有权限
+  if (role === 'admin') perms = DEFAULT_PERMS; 
+  
+  // 仅在非管理员角色中，检查是否至少勾选了一个权限
+  if (role !== 'admin' && perms.length === 0) {
+      if(!confirm("您未勾选任何业务权限。该用户将看不到任何交易记录，确定继续吗？")) return;
+  }
+
+  DB.users.push({
+      id:uuid(), name, username:user, password:pass, role:role,
+      remark: remark, // V6.6: 存入备注
+      allowedGroups: perms // V6.6: 存入权限
+  }); 
+
+  saveDB(); renderUsers(); 
+  document.getElementById('new-u-name').value = document.getElementById('new-u-user').value = document.getElementById('new-u-pass').value = document.getElementById('new-u-remark').value = '';
+  document.querySelectorAll('#permission-checkboxes input').forEach(cb => cb.checked = false);
+}
+
+function delUser(id) { 
+  if(!confirm("确定删除该用户吗？")) return;
+  DB.users = DB.users.filter(u=>u.id!==id); 
+  saveDB(); renderUsers(); 
+}
+
+// 初始化时设置默认日期为本月
+init();
+if(document.getElementById('dash-start')) {
+    const now = new Date();
+    document.getElementById('dash-start').value = now.toISOString().slice(0,7) + '-01';
+    document.getElementById('dash-end').value = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+}
+
+</script>
+</body>
+</html>
